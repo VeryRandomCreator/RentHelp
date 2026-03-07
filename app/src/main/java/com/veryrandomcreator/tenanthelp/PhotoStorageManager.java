@@ -29,7 +29,7 @@ import java.util.concurrent.Executors;
 public class PhotoStorageManager {
 
     private static final String PREFS_FILENAME = "secure_photo_prefs";
-    private static final String KEY_PHOTOS_JSON = "photos_json";
+    private static final String BASE_KEY_PHOTOS_JSON = "photos_json_";
     private static final ExecutorService executor = Executors.newSingleThreadExecutor();
     private static final Handler mainHandler = new Handler(Looper.getMainLooper());
 
@@ -74,7 +74,7 @@ public class PhotoStorageManager {
      */
 
 
-    public static void savePhotoData(Context context, String label, String notes, Bitmap bitmap, SaveCallback callback) {
+    public static void savePhotoData(Context context, String propertyId, String label, String notes, Bitmap bitmap, SaveCallback callback) {
         executor.execute(() -> {
             try {
                 MasterKey masterKey = new MasterKey.Builder(context)
@@ -110,8 +110,10 @@ public class PhotoStorageManager {
                         EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
                 );
 
+                String prefsKey = BASE_KEY_PHOTOS_JSON + propertyId;
+                System.out.println("SAVED TO " + id + ".png");
                 JSONArray jsonArray;
-                String existingJson = sharedPreferences.getString(KEY_PHOTOS_JSON, "[]");
+                String existingJson = sharedPreferences.getString(prefsKey, "[]");
                 jsonArray = new JSONArray(existingJson);
 
                 JSONObject newItem = new JSONObject();
@@ -121,7 +123,7 @@ public class PhotoStorageManager {
 
                 jsonArray.put(newItem);
 
-                sharedPreferences.edit().putString(KEY_PHOTOS_JSON, jsonArray.toString()).apply();
+                sharedPreferences.edit().putString(prefsKey, jsonArray.toString()).apply();
 
                 mainHandler.post(() -> {
                     if (callback != null) callback.onSuccess(id);
@@ -136,7 +138,113 @@ public class PhotoStorageManager {
         });
     }
 
-    public static void deletePhotoData(Context context, String id, SaveCallback callback) {
+    // Updates an existing photo entry: overwrites the bitmap file and patches label/notes in JSON
+    public static void updatePhotoData(Context context, String propertyId, String existingId, String label, String notes, Bitmap bitmap, SaveCallback callback) {
+        executor.execute(() -> {
+            try {
+                MasterKey masterKey = new MasterKey.Builder(context)
+                        .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+                        .build();
+
+                // 1. Overwrite the existing encrypted PNG file
+                File file = new File(context.getFilesDir(), existingId + ".png");
+                if (file.exists()) {
+                    file.delete();
+                }
+
+                EncryptedFile encryptedFile = new EncryptedFile.Builder(
+                        context,
+                        file,
+                        masterKey,
+                        EncryptedFile.FileEncryptionScheme.AES256_GCM_HKDF_4KB
+                ).build();
+
+                try (FileOutputStream outputStream = encryptedFile.openFileOutput()) {
+                    bitmap.compress(Bitmap.CompressFormat.PNG, 100, outputStream);
+                }
+
+                // 2. Patch the metadata entry in EncryptedSharedPreferences
+                EncryptedSharedPreferences sharedPreferences = (EncryptedSharedPreferences) EncryptedSharedPreferences.create(
+                        context,
+                        PREFS_FILENAME,
+                        masterKey,
+                        EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                        EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+                );
+
+                String prefsKey = BASE_KEY_PHOTOS_JSON + propertyId;
+                String existingJson = sharedPreferences.getString(prefsKey, "[]");
+                JSONArray jsonArray = new JSONArray(existingJson);
+
+                for (int i = 0; i < jsonArray.length(); i++) {
+                    JSONObject obj = jsonArray.getJSONObject(i);
+                    if (obj.getString("id").equals(existingId)) {
+                        obj.put("label", label);
+                        obj.put("notes", notes);
+                        break;
+                    }
+                }
+
+                sharedPreferences.edit().putString(prefsKey, jsonArray.toString()).apply();
+
+                mainHandler.post(() -> {
+                    if (callback != null) callback.onSuccess(existingId);
+                });
+
+            } catch (Exception e) {
+                e.printStackTrace();
+                mainHandler.post(() -> {
+                    if (callback != null) callback.onError(e);
+                });
+            }
+        });
+    }
+
+    // Updates only the label and notes in the JSON, skipping the (expensive) file write entirely
+    public static void updatePhotoMetadataOnly(Context context, String propertyId, String existingId, String label, String notes, SaveCallback callback) {
+        executor.execute(() -> {
+            try {
+                MasterKey masterKey = new MasterKey.Builder(context)
+                        .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+                        .build();
+
+                EncryptedSharedPreferences sharedPreferences = (EncryptedSharedPreferences) EncryptedSharedPreferences.create(
+                        context,
+                        PREFS_FILENAME,
+                        masterKey,
+                        EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                        EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+                );
+
+                String prefsKey = BASE_KEY_PHOTOS_JSON + propertyId;
+                String existingJson = sharedPreferences.getString(prefsKey, "[]");
+                JSONArray jsonArray = new JSONArray(existingJson);
+
+                for (int i = 0; i < jsonArray.length(); i++) {
+                    JSONObject obj = jsonArray.getJSONObject(i);
+                    if (obj.getString("id").equals(existingId)) {
+                        obj.put("label", label);
+                        obj.put("notes", notes);
+                        break;
+                    }
+                }
+
+                sharedPreferences.edit().putString(prefsKey, jsonArray.toString()).apply();
+
+                mainHandler.post(() -> {
+                    if (callback != null) callback.onSuccess(existingId);
+                });
+
+            } catch (Exception e) {
+                e.printStackTrace();
+                mainHandler.post(() -> {
+                    if (callback != null) callback.onError(e);
+                });
+            }
+        });
+    }
+
+    public static void deletePhotoData(Context context, String propertyId, String id, SaveCallback callback) {
         executor.execute(() -> {
             try {
                 MasterKey masterKey = new MasterKey.Builder(context)
@@ -158,7 +266,8 @@ public class PhotoStorageManager {
                         EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
                 );
 
-                String existingJson = sharedPreferences.getString(KEY_PHOTOS_JSON, "[]");
+                String prefsKey = BASE_KEY_PHOTOS_JSON + propertyId;
+                String existingJson = sharedPreferences.getString(prefsKey, "[]");
                 JSONArray jsonArray = new JSONArray(existingJson);
                 JSONArray newArray = new JSONArray();
 
@@ -170,7 +279,7 @@ public class PhotoStorageManager {
                     }
                 }
 
-                sharedPreferences.edit().putString(KEY_PHOTOS_JSON, newArray.toString()).apply();
+                sharedPreferences.edit().putString(prefsKey, newArray.toString()).apply();
 
                 mainHandler.post(() -> {
                     if (callback != null) callback.onSuccess(id);
@@ -185,7 +294,7 @@ public class PhotoStorageManager {
         });
     }
 
-    public static List<PropertyImage> loadPhotos(Context context) throws GeneralSecurityException, IOException, JSONException {
+    public static List<PropertyImage> loadPropertyImageData(Context context, String propertyId) throws GeneralSecurityException, IOException, JSONException {
         MasterKey masterKey = new MasterKey.Builder(context)
                 .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
                 .build();
@@ -198,7 +307,8 @@ public class PhotoStorageManager {
                 EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
         );
 
-        String jsonString = sharedPreferences.getString(KEY_PHOTOS_JSON, "[]");
+        String prefsKey = BASE_KEY_PHOTOS_JSON + propertyId;
+        String jsonString = sharedPreferences.getString(prefsKey, "[]");
         JSONArray jsonArray = new JSONArray(jsonString);
 
         List<PropertyImage> items = new ArrayList<>();
@@ -220,6 +330,7 @@ public class PhotoStorageManager {
 
         File file = new File(context.getFilesDir(), id + ".png");
         if (!file.exists()) {
+            System.out.println("IT DOESN'T EXIST: " + id + ".png");
             return null;
         }
 
@@ -237,7 +348,7 @@ public class PhotoStorageManager {
                 return BitmapFactory.decodeStream(inputStream, null, options);
             }
 
-            return BitmapFactory.decodeStream(null);
+            return BitmapFactory.decodeStream(inputStream);
         }
     }
 }

@@ -30,8 +30,7 @@ public class MainActivity extends AppCompatActivity {
                         writePdfToUri(selectedUri);
                     }
                 }
-            }
-    );
+            });
 
     private void writePdfToUri(Uri uri) {
         // NOTE: For production apps, execute this block on a background thread!
@@ -54,60 +53,70 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    private Button button;
-    private Button savePdf;
-
     private PdfDocument output;
+    private androidx.recyclerview.widget.RecyclerView recyclerView;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        PropertyPackage propertyPackage = new PropertyPackage();
-        propertyPackage.fetchLatestHash();
-        try {
-            propertyPackage.setImages(PhotoStorageManager.loadPhotos(this));
-        } catch (GeneralSecurityException e) {
-            throw new RuntimeException(e);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        } catch (JSONException e) {
-            throw new RuntimeException(e);
-        }
+        recyclerView = findViewById(R.id.recycler_view_properties);
+        recyclerView.setLayoutManager(new androidx.recyclerview.widget.LinearLayoutManager(this));
+        refreshPropertiesList();
 
-        button = findViewById(R.id.temp_btn);
-        savePdf = findViewById(R.id.savePdf);
-
-        button.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                getSupportFragmentManager().beginTransaction().setReorderingAllowed(true)
-                        .add(R.id.fragmentContainerView, PropertyPhotosListFragment.class, null).commit();
+        // Refresh the list any time a fragment pops back to this screen
+        getSupportFragmentManager().addOnBackStackChangedListener(() -> {
+            if (getSupportFragmentManager().getBackStackEntryCount() == 0) {
+                refreshPropertiesList();
             }
         });
-        
-        savePdf.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                try {
-                    output = propertyPackage.generatePdf(getApplicationContext());
 
-                    Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
+        com.google.android.material.floatingactionbutton.FloatingActionButton fabAddProperty = findViewById(
+                R.id.fab_add_property);
 
-                    intent.addCategory(Intent.CATEGORY_OPENABLE);
+        fabAddProperty.setOnClickListener(v -> {
+            String newId = java.util.UUID.randomUUID().toString();
+            Property newProperty = new Property(newId, "New Property", "");
+            PropertyStorageManager.savePropertyData(this, newProperty, new PropertyStorageManager.SaveCallback() {
+                @Override
+                public void onSuccess(String id) {
+                    PropertyPhotosListFragment fragment = new PropertyPhotosListFragment();
+                    Bundle args = new Bundle();
+                    args.putString("propertyId", id);
+                    fragment.setArguments(args);
 
-                    intent.setType("application/pdf");
-
-                    intent.putExtra(Intent.EXTRA_TITLE, "Timestamped-Inspection.pdf");
-
-                    savePdfLauncher.launch(intent);
-                } catch (GeneralSecurityException e) {
-                    throw new RuntimeException(e);
-                } catch (IOException e) {
-                    throw new RuntimeException(e);
+                    getSupportFragmentManager().beginTransaction().setReorderingAllowed(true)
+                            .add(R.id.fragmentContainerView, fragment)
+                            .addToBackStack(null)
+                            .commit();
                 }
-            }
+
+                @Override
+                public void onError(Exception e) {
+                    e.printStackTrace();
+                }
+            });
         });
+    }
+
+    private void refreshPropertiesList() {
+        try {
+            java.util.List<Property> properties = PropertyStorageManager.loadProperties(this);
+            PropertiesAdapter adapter = new PropertiesAdapter(properties, item -> {
+                PropertyPhotosListFragment fragment = new PropertyPhotosListFragment();
+                Bundle args = new Bundle();
+                args.putString("propertyId", item.getId());
+                fragment.setArguments(args);
+
+                getSupportFragmentManager().beginTransaction().setReorderingAllowed(true)
+                        .add(R.id.fragmentContainerView, fragment)
+                        .addToBackStack(null)
+                        .commit();
+            });
+            recyclerView.setAdapter(adapter);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 }

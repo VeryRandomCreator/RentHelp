@@ -1,59 +1,76 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
+    android:layout_height="wrap_content"
     android:orientation="vertical"
-    android:padding="16dp"
     android:background="@color/white">
 
-    <Button
-        android:id="@+id/button_take_photo"
+    <!-- Header: Label EditText + more_vert overflow button -->
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Take Photo" />
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingStart="16dp"
+        android:paddingEnd="4dp"
+        android:paddingTop="16dp">
 
-    <EditText
-        android:id="@+id/image_label_edt"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:hint="Image Label (Ex: Bathroom tiles)"
-        android:inputType="text"
-        android:gravity="top|start" />
+        <EditText
+            android:id="@+id/image_label_edt"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:hint="Image Label"
+            android:inputType="text"
+            android:maxLines="1"
+            android:textSize="18sp"
+            android:textStyle="bold" />
 
+        <ImageButton
+            android:id="@+id/button_more_options"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:src="@drawable/more_vert"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="More options"
+            android:scaleType="center" />
+
+    </LinearLayout>
+
+    <!-- Photo display -->
     <ImageView
         android:id="@+id/image_view_photo"
         android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
+        android:layout_height="280dp"
         android:scaleType="fitCenter"
         android:contentDescription="Taken Photo"
         android:layout_marginTop="8dp"
-        android:layout_marginBottom="8dp" />
+        android:layout_marginStart="16dp"
+        android:layout_marginEnd="16dp"
+        android:background="#F0F0F0" />
 
+    <!-- Notes / description -->
     <EditText
         android:id="@+id/image_notes_edt"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:hint="What is this image of?\nAdd notes here..."
+        android:layout_marginStart="16dp"
+        android:layout_marginEnd="16dp"
+        android:layout_marginTop="8dp"
+        android:hint="What is this image of? Add notes here..."
         android:inputType="textMultiLine"
         android:minLines="3"
         android:gravity="top|start" />
 
+    <!-- Take Photo at the bottom -->
     <Button
-        android:id="@+id/button_save_photo"
+        android:id="@+id/button_take_photo"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:layout_marginEnd="16dp"
         android:layout_marginTop="16dp"
-        android:text="Save" />
-
-    <Button
-        android:id="@+id/button_delete_photo"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:layout_marginBottom="16dp"
-        android:text="Delete"
-        android:textColor="@android:color/holo_red_dark"
-        android:visibility="gone" />
+        android:layout_marginBottom="24dp"
+        android:text="Take Photo" />
 
 </LinearLayout>
