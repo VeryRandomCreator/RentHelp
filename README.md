@@ -37,7 +37,4 @@ Visit the [Rent Help CLI Verification Tool](https://github.com/VeryRandomCreator
 ## AI Use Declaration
 This hackathon submission is targeting the Google Antigravity track, so Google Antigravity and Gemini were heavily used during the development of this project. 
 
-## Contact
-VeryRandomCreator's email: `veryrandomcreator@gmail.com`
-
 Note: Disregard difference in app name vs repo (TenantHelp vs RentHelp). I wanted to change the overall name to RentHelp but was running out of time to change the Android details
