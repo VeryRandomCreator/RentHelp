@@ -1,7 +1,9 @@
 package com.veryrandomcreator.tenanthelp;
 
+import android.content.Context;
 import android.security.keystore.KeyGenParameterSpec;
 import android.security.keystore.KeyProperties;
+import android.util.Base64;
 
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
@@ -11,6 +13,7 @@ import java.security.Signature;
 import java.security.cert.Certificate;
 import java.security.spec.ECGenParameterSpec;
 
+// Used Google Gemini for most of this
 public class HardwareKeyManager {
     private static final String KEY_ALIAS = "RentalDisputeKey";
 
@@ -41,7 +44,7 @@ public class HardwareKeyManager {
         KeyPair keyPair = keyPairGenerator.generateKeyPair();
     }
 
-    public static Certificate[] getCertificateChain() throws Exception {
+    private static Certificate[] getCertificateChain() throws Exception {
         // Load the Android KeyStore
         KeyStore keyStore = KeyStore.getInstance("AndroidKeyStore");
         keyStore.load(null);
@@ -54,6 +57,23 @@ public class HardwareKeyManager {
         }
 
         return certChain;
+    }
+
+    // save as .pem
+    public static byte[] getCertificateChainBytes() throws Exception {
+        StringBuilder pemBuilder = new StringBuilder();
+        Certificate[] certificateChain = getCertificateChain();
+
+        for (Certificate cert : certificateChain) {
+            String base64Cert = Base64.encodeToString(cert.getEncoded(), Base64.NO_WRAP);
+
+            // 2. Wrap it in the standard PEM headers
+            pemBuilder.append("-----BEGIN CERTIFICATE-----\n");
+            pemBuilder.append(base64Cert).append("\n");
+            pemBuilder.append("-----END CERTIFICATE-----\n");
+        }
+
+        return pemBuilder.toString().getBytes();
     }
 
     public static byte[] signPdfDocument(byte[] pdfBytes) throws Exception {

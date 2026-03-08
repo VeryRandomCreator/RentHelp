@@ -33,49 +33,34 @@ public class PropertyPackage {
     public static final Rect MAX_IMAGE_DIM = new Rect(0, 0, PDF_PAGE_WIDTH, PDF_PAGE_HEIGHT / 2);
 
     private List<PropertyImage> images = new ArrayList<>();
-    private String latestHash;
+    private String label;
+    private String description;
 
     public void setImages(List<PropertyImage> images) {
         this.images = images;
+    }
+
+    public String getLabel() {
+        return label;
+    }
+
+    public void setLabel(String label) {
+        this.label = label;
+    }
+
+    public String getDescription() {
+        return description;
+    }
+
+    public void setDescription(String description) {
+        this.description = description;
     }
 
     public List<PropertyImage> getImages() {
         return images;
     }
 
-    public String getLatestHash() {
-        return latestHash;
-    }
-
-    public void fetchLatestHash() {
-        Thread thread = new Thread(new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    URL url = new URL("https://mempool.space/api/blocks/tip/hash");
-                    HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-                    conn.setRequestMethod("GET");
-
-                    BufferedReader in = new BufferedReader(new InputStreamReader(conn.getInputStream()));
-                    String hash = in.readLine();
-                    in.close();
-
-                    latestHash = hash;
-                    System.out.println(latestHash);
-                } catch (MalformedURLException | ProtocolException e) {
-                    e.printStackTrace();
-                    throw new RuntimeException(e);
-                } catch (IOException e) {
-                    e.printStackTrace();
-                    throw new RuntimeException(e);
-                }
-
-            }
-        });
-        thread.start();
-    }
-
-    // TODO: ADD CHECK FOR LATESTHASH
+    // Assumes latesthash has been set
     private Bitmap getStampedImage(Context context, PropertyImage image) throws GeneralSecurityException, IOException {
         Bitmap bitmap = PhotoStorageManager.loadPhotoBitmap(context, image.getId(), true);
 
@@ -86,7 +71,7 @@ public class PropertyPackage {
         paint.setTextSize(50f);
         paint.setShadowLayer(5f, 2f, 2f, Color.BLACK);
 
-        canvas.drawText(latestHash, canvas.getWidth() / 2, canvas.getHeight() / 2, paint);
+        canvas.drawText(image.getLatestHash(), 0, 50, paint);
 
         return bitmap;
     }
@@ -102,7 +87,6 @@ public class PropertyPackage {
 
         boolean hasFinishedPage = false;
         for (int i = 0; i < images.size(); i++) {
-            System.out.println("WRITING");
             if (i % 2 == 0) {
                 pageInfo = new PageInfo.Builder(PDF_PAGE_WIDTH, PDF_PAGE_HEIGHT, i / 2 + 1).create();
                 page = document.startPage(pageInfo);
@@ -111,13 +95,11 @@ public class PropertyPackage {
             }
 
             stampedImage = getStampedImage(context, images.get(i));
-            Rect dest = new Rect(0, 0, stampedImage.getWidth(), stampedImage.getHeight());
+            Rect dest = new Rect(PDF_PADDING, PDF_PADDING, stampedImage.getWidth() - PDF_PADDING, stampedImage.getHeight() - PDF_PADDING);
             scaleToFit(MAX_IMAGE_DIM, dest);
             dest.top += i % 2 * MAX_IMAGE_DIM.bottom;
             dest.bottom += i % 2 * MAX_IMAGE_DIM.bottom;
-            System.out.println("BEFORE BITMAP: " + stampedImage);
             canvas.drawBitmap(stampedImage, null, dest, null);
-            System.out.println("AFTER BITMAP");
 
             // also draw text and other info
 
@@ -125,7 +107,6 @@ public class PropertyPackage {
                 document.finishPage(page);
                 hasFinishedPage = true;
             }
-            System.out.println("after FINISH");
         }
         if (!hasFinishedPage) {
             document.finishPage(page);

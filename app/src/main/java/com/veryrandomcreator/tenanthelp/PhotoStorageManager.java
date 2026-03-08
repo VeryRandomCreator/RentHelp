@@ -12,10 +12,16 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.MalformedURLException;
+import java.net.ProtocolException;
+import java.net.URL;
 import java.security.GeneralSecurityException;
 import java.util.ArrayList;
 import java.util.List;
@@ -23,6 +29,7 @@ import java.util.UUID;
 
 import android.os.Handler;
 import android.os.Looper;
+
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -35,44 +42,9 @@ public class PhotoStorageManager {
 
     public interface SaveCallback {
         void onSuccess(String id);
+
         void onError(Exception e);
     }
-
-    /*
-    // Updates an existing bitmap in storage at id dest with bitmap
-    // Does nothing if dest does not correspond to existing image
-    public static void updateBitmap(Context context, Bitmap bitmap, String dest) throws GeneralSecurityException, IOException {
-        MasterKey masterKey = new MasterKey.Builder(context)
-                .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
-                .build();
-
-        EncryptedSharedPreferences sharedPreferences = (EncryptedSharedPreferences) EncryptedSharedPreferences.create(
-                context,
-                PREFS_FILENAME,
-                masterKey,
-                EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-                EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
-        );
-
-        File file = new File(context.getFilesDir(), dest + ".png");
-        EncryptedFile encryptedFile = new EncryptedFile.Builder(
-                context,
-                file,
-                masterKey,
-                EncryptedFile.FileEncryptionScheme.AES256_GCM_HKDF_4KB
-        ).build();
-
-        if (!file.exists()) {
-            return;
-        }
-
-        try (FileOutputStream outputStream = encryptedFile.openFileOutput()) {
-            bitmap.compress(Bitmap.CompressFormat.PNG, 100, outputStream);
-        }
-    }
-
-     */
-
 
     public static void savePhotoData(Context context, String propertyId, String label, String notes, Bitmap bitmap, SaveCallback callback) {
         executor.execute(() -> {
@@ -120,6 +92,7 @@ public class PhotoStorageManager {
                 newItem.put("id", id);
                 newItem.put("label", label);
                 newItem.put("notes", notes);
+                newItem.put("latest_hash", getLatestHash());
 
                 jsonArray.put(newItem);
 
@@ -176,11 +149,14 @@ public class PhotoStorageManager {
                 String existingJson = sharedPreferences.getString(prefsKey, "[]");
                 JSONArray jsonArray = new JSONArray(existingJson);
 
+
+
                 for (int i = 0; i < jsonArray.length(); i++) {
                     JSONObject obj = jsonArray.getJSONObject(i);
                     if (obj.getString("id").equals(existingId)) {
                         obj.put("label", label);
                         obj.put("notes", notes);
+                        obj.put("latest_hash", getLatestHash());
                         break;
                     }
                 }
@@ -198,6 +174,18 @@ public class PhotoStorageManager {
                 });
             }
         });
+    }
+
+    // Do not run on main thread
+    public static String getLatestHash() throws IOException {
+        URL url = new URL("https://mempool.space/api/blocks/tip/hash");
+        HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+        conn.setRequestMethod("GET");
+
+        BufferedReader in = new BufferedReader(new InputStreamReader(conn.getInputStream()));
+        String latestHash = in.readLine();
+        in.close();
+        return latestHash;
     }
 
     // Updates only the label and notes in the JSON, skipping the (expensive) file write entirely
@@ -317,7 +305,8 @@ public class PhotoStorageManager {
             String id = obj.getString("id");
             String label = obj.getString("label");
             String notes = obj.getString("notes");
-            items.add(new PropertyImage(id, label, notes));
+            String latestHash = obj.getString("latest_hash");
+            items.add(new PropertyImage(id, label, notes, latestHash));
         }
 
         return items;
@@ -330,7 +319,6 @@ public class PhotoStorageManager {
 
         File file = new File(context.getFilesDir(), id + ".png");
         if (!file.exists()) {
-            System.out.println("IT DOESN'T EXIST: " + id + ".png");
             return null;
         }
 

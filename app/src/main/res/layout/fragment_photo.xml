@@ -3,7 +3,7 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
-    android:background="@color/white">
+    android:background="?android:attr/colorBackground">
 
     <!-- Header: Label EditText + more_vert overflow button -->
     <LinearLayout
@@ -47,7 +47,7 @@
         android:layout_marginTop="8dp"
         android:layout_marginStart="16dp"
         android:layout_marginEnd="16dp"
-        android:background="#F0F0F0" />
+        android:background="?attr/colorSurface" />
 
     <!-- Notes / description -->
     <EditText
